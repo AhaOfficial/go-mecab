@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/shogo82148/go-mecab"
+	"github.com/AhaOfficial/go-mecab"
 )
 
 func ExampleMeCab_Parse() {
