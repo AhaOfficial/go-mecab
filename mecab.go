@@ -8,7 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"runtime"
+	"strings"
 	"unsafe"
 )
 
@@ -153,6 +155,62 @@ func (m MeCab) ParseToNode(s string) (Node, error) {
 		node:  node,
 		mecab: m.m,
 	}, nil
+}
+
+// ParseToWordNodes parses the string and returns the result as Node
+func (m MeCab) ParseToWordNodes(s string) ([]WordNode, error) {
+	if m.m.mecab == nil {
+		panic(errMeCabNotAvailable)
+	}
+
+	wordNodeList := []WordNode{}
+	wordList := strings.Split(regexp.MustCompile(`\s+`).ReplaceAllString(s, " "), " ")
+	for _, word := range wordList {
+		wordNodeList = append(wordNodeList, WordNode{
+			Word:              word,
+			Nodes:             []TokenizedWord{},
+			WordLength:        len(word),
+			NodeSurfaceLength: 0,
+		})
+	}
+
+	length := C.size_t(len(s))
+	if s == "" {
+		s = "dummy"
+	}
+	header := (*reflect.StringHeader)(unsafe.Pointer(&s))
+	input := (*C.char)(unsafe.Pointer(header.Data))
+
+	node := C.mecab_sparse_tonode2(m.m.mecab, input, length)
+	if node == nil {
+		return []WordNode{}, newError(m.m.mecab)
+	}
+	runtime.KeepAlive(s)
+
+	mecabNode := Node{
+		node:  node,
+		mecab: m.m,
+	}
+	mecabNode = mecabNode.Next()
+
+	idx := 0
+	for idx < len(wordNodeList) {
+		surface, feature := mecabNode.Surface(), strings.Split(mecabNode.Feature(), ",")[0]
+		wordNodeList[idx].Nodes = append(
+			wordNodeList[idx].Nodes,
+			TokenizedWord{
+				Surface: surface,
+				Feature: feature,
+			},
+		)
+		wordNodeList[idx].NodeSurfaceLength += len(surface)
+		if wordNodeList[idx].WordLength == wordNodeList[idx].NodeSurfaceLength {
+			idx += 1
+		}
+		mecabNode = mecabNode.Next()
+	}
+
+	return wordNodeList, nil
 }
 
 func (m MeCab) Error() error {

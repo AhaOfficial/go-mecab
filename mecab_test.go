@@ -1,6 +1,7 @@
 package mecab
 
 import (
+	"fmt"
 	"os"
 	"runtime"
 	"strings"
@@ -150,6 +151,50 @@ func TestParseToNode(t *testing.T) {
 	node = node.Next()
 	if node.Surface() != "世界" {
 		t.Errorf("want 世界, but %s", node.Surface())
+	}
+}
+
+func TestParseToWordNodes(t *testing.T) {
+	mecab, err := New(rcfile(map[string]string{}))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+	defer mecab.Destroy()
+
+	// XXX: avoid GC, MeCab 0.996 has GC problem (see https://github.com/taku910/mecab/pull/24)
+	mecab.Parse("")
+
+	wordNodeList, err := mecab.ParseToWordNodes("こんにちは世界  こんばんは世界")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+
+	if len(wordNodeList) != 2 {
+		t.Errorf("want 2, but %d", len(wordNodeList))
+	}
+	if len(wordNodeList[0].Nodes) != 2 {
+		t.Errorf("want 2, but %d", len(wordNodeList[0].Nodes))
+	}
+	if len(wordNodeList[1].Nodes) != 2 {
+		t.Errorf("want 2, but %d", len(wordNodeList[1].Nodes))
+	}
+
+	wordNodeStrings := fmt.Sprintf("%s|%s", wordNodeList[0].Word, wordNodeList[1].Word)
+	if wordNodeStrings != "こんにちは世界|こんばんは世界" {
+		t.Errorf("want こんにちは世界|こんばんは世界, but %s", wordNodeStrings)
+	}
+
+	surfaceStrings := fmt.Sprintf(
+		"%s|%s|%s|%s",
+		wordNodeList[0].Nodes[0].Surface,
+		wordNodeList[0].Nodes[1].Surface,
+		wordNodeList[1].Nodes[0].Surface,
+		wordNodeList[1].Nodes[1].Surface,
+	)
+	if surfaceStrings != "こんにちは|世界|こんばんは|世界" {
+		t.Errorf("want こんにちは|世界|こんばんは|世界, but %s", surfaceStrings)
 	}
 }
 
